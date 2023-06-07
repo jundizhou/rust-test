@@ -80,33 +80,12 @@ impl std::fmt::Display for Category {
     }
 }
 
-#[derive(Debug)]
-pub enum ValueType {
-    None = 0,
-    Int8 = 1,
-    Int16 = 2,
-    Int32 = 3,
-    Int64 = 4,
-    UInt8 = 5,
-    UInt16 = 6,
-    UInt32 = 7,
-    UInt64 = 8,
-    Charbuf = 9,
-    Bytebuf = 10,
-    Float = 11,
-    Double = 12,
-    Bool = 13,
-}
 
-impl Default for ValueType {
-    fn default() -> Self {
-        ValueType::None
-    }
-}
+
 
 pub struct KeyValue {
     pub key: String,
-    pub value_type: ValueType,
+    pub value_type: u32,
     pub value: Vec<u8>,
 }
 
@@ -149,27 +128,6 @@ pub struct KindlingEvent {
     pub ctx: Context,
 }
 
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let name = match self {
-            ValueType::None => "NONE",
-            ValueType::Int8 => "INT8",
-            ValueType::Int16 => "INT16",
-            ValueType::Int32 => "INT32",
-            ValueType::Int64 => "INT64",
-            ValueType::UInt8 => "UINT8",
-            ValueType::UInt16 => "UINT16",
-            ValueType::UInt32 => "UINT32",
-            ValueType::UInt64 => "UINT64",
-            ValueType::Charbuf => "CHARBUF",
-            ValueType::Bytebuf => "BYTEBUF",
-            ValueType::Float => "FLOAT",
-            ValueType::Double => "DOUBLE",
-            ValueType::Bool => "BOOL",
-        };
-        write!(f, "{}", name)
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct SubEvent {

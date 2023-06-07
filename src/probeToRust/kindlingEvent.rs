@@ -1,13 +1,42 @@
+use std::ffi::CStr;
 use libc::c_char;
+
+
+const CPU_EVENT: &str = "cpu_event";
+const JAVA_FUTEX_INFO: &str = "java_futex_info";
+const TRANSACTION_ID_EVENT: &str = "apm_trace_id_event";
+const SPAN_EVENT: &str = "apm_span_event";
+const OTHER_EVENT: &str = "other";
+
+const ValueType_NONE: u32 = 0;
+const ValueType_INT8: u32 = 1;
+const ValueType_INT16: u32 = 2;
+const ValueType_INT32: u32 = 3;
+const ValueType_INT64: u32 = 4;
+const ValueType_UINT8: u32 = 5;
+const ValueType_UINT16: u32 = 6;
+const ValueType_UINT32: u32 = 7;
+const ValueType_UINT64: u32 = 8;
+const ValueType_CHARBUF: u32 = 9;
+const ValueType_BYTEBUF: u32 = 10;
+const ValueType_FLOAT: u32 = 11;
+const ValueType_DOUBLE: u32 = 12;
+const ValueType_BOOL: u32 = 13;
+
+
+
 
 #[repr(C)]
 #[derive(Copy)]
+#[derive(Debug)]
 pub struct KeyValue {
     key: *mut libc::c_char,
     value: *mut libc::c_char,
     len: u32,
     valueType: u32,
 }
+
+
 impl Default for KeyValue {
     fn default() -> Self {
         KeyValue {
@@ -38,6 +67,7 @@ impl Clone for KeyValue {
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct KindlingEventForGo {
     pub(crate) timestamp: u64,
     pub(crate) name: *mut libc::c_char,
@@ -46,6 +76,92 @@ pub struct KindlingEventForGo {
     pub(crate) latency: u64,
     pub(crate) userAttributes: [KeyValue; 16],
     pub(crate) context: EventContext,
+}
+
+impl KindlingEventForGo {
+    pub fn get_pid(&self) -> u32 {
+        let ctx = self.get_ctx();
+        if let Some(ctx) = ctx {
+            let thread_info = ctx.get_thread_info();
+            if let Some(thread_info) = thread_info {
+                return thread_info.pid;
+            }
+        }
+        0
+    }
+
+
+    pub fn get_tid(&self) -> u32 {
+        let ctx = self.get_ctx();
+        if let Some(ctx) = ctx {
+            let thread_info = ctx.get_thread_info();
+            if let Some(thread_info) = thread_info {
+                return thread_info.tid;
+            }
+        }
+        0
+    }
+
+    pub fn get_comm(&self) -> String {
+        if let Some(ctx) = self.get_ctx() {
+            if let Some(thread_info) = ctx.get_thread_info() {
+                let c_str = unsafe { CStr::from_ptr(thread_info.comm) };
+                if let Ok(str_slice) = c_str.to_str() {
+                    return str_slice.to_string();
+                }
+            }
+        }
+        String::new()
+    }
+
+    fn get_ctx(&self) -> Option<&EventContext> {
+        Some(&self.context)
+    }
+
+}
+
+impl KeyValue {
+    pub fn get_key(&self) -> Option<&str> {
+        if !self.key.is_null() {
+            unsafe {
+                let cstr = CStr::from_ptr(self.key);
+                Some(std::str::from_utf8_unchecked(cstr.to_bytes()))
+            }
+        } else {
+            None
+        }
+    }
+    pub fn get_value(&self) -> Option<&[u8]> {
+        if !self.value.is_null() {
+            unsafe {
+                Some(std::slice::from_raw_parts(self.value as *const u8, self.len as usize))
+            }
+        } else {
+            None
+        }
+    }
+
+
+    pub fn get_uint_value(&self) -> u64 {
+        let value_slice = unsafe { std::slice::from_raw_parts(self.value as *const u8, self.len as usize) };
+        match self.valueType {
+            ValueType_UINT8 => value_slice[0] as u64,
+            ValueType_UINT16 => u16::from_le_bytes([value_slice[0], value_slice[1]]) as u64,
+            ValueType_UINT32 => u32::from_le_bytes([value_slice[0], value_slice[1], value_slice[2], value_slice[3]]) as u64,
+            ValueType_UINT64 => u64::from_le_bytes([value_slice[0], value_slice[1], value_slice[2], value_slice[3], value_slice[4], value_slice[5], value_slice[6], value_slice[7]]),
+            _ => 0,
+        }
+    }
+    pub fn get_int_value(&self) -> i64 {
+        let value_slice = unsafe { std::slice::from_raw_parts(self.value as *const u8, self.len as usize) };
+        match self.valueType {
+            ValueType_INT8 => value_slice[0] as i8 as i64,
+            ValueType_INT16 => i16::from_le_bytes([value_slice[0], value_slice[1]]) as i64,
+            ValueType_INT32 => i32::from_le_bytes([value_slice[0], value_slice[1], value_slice[2], value_slice[3]]) as i64,
+            ValueType_INT64 => i64::from_le_bytes([value_slice[0], value_slice[1], value_slice[2], value_slice[3], value_slice[4], value_slice[5], value_slice[6], value_slice[7]]),
+            _ => 0,
+        }
+    }
 }
 
 impl Default for KindlingEventForGo {
@@ -160,12 +276,20 @@ impl Default for FdInfo {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct EventContext {
     pub(crate) tinfo: ThreadInfo,
     pub(crate) fdInfo: FdInfo,
 }
 
+impl EventContext {
+    fn get_thread_info(&self) -> Option<&ThreadInfo> {
+        Some(&self.tinfo)
+    }
+}
+
 #[repr(C)]
+#[derive(Debug)]
 pub struct ThreadInfo {
     pub(crate) pid: u32,
     pub(crate) tid: u32,
@@ -176,6 +300,7 @@ pub struct ThreadInfo {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct FdInfo {
     pub(crate) num: i32,
     pub(crate) fdType: u32,
