@@ -68,13 +68,13 @@ pub fn consume_cpu_event(event: &KindlingEventForGo, cca: &Arc<Mutex<CpuAnalyzer
     );
 }
 
-fn consume_java_futex_event(event: &KindlingEventForGo, cca: &Arc<Mutex<CpuAnalyzer>>) {
+pub fn consume_java_futex_event(event: &KindlingEventForGo, cca: &Arc<Mutex<CpuAnalyzer>>) {
     let mut ev = Box::new(JavaFutexEvent::default());
     ev.start_time = event.timestamp;
     for i in 0..event.paramsNumber as usize {
         let user_attributes = event.userAttributes[i];
         match user_attributes.get_key() {
-            Some("end_time") => ev.end_time = user_attributes.get_uint_value(),
+            Some("end_time") => ev.end_time = read_string_value(user_attributes.get_value()).parse().unwrap(),
             Some("data") => ev.data_val = read_string_value(user_attributes.get_value()),
             _ => (),
         }
@@ -111,11 +111,15 @@ impl CpuAnalyzer {
             }
         });
 
-        let end_offset = (event.end_timestamp() / NANO_TO_SECONDS - time_segments.base_time) as i32;
-        if end_offset < 0 {
+        if event.end_timestamp() / NANO_TO_SECONDS < time_segments.base_time {
             return;
         }
+        let end_offset = (event.end_timestamp() / NANO_TO_SECONDS - time_segments.base_time) as i32;
 
+
+        if event.start_timestamp() / NANO_TO_SECONDS < time_segments.base_time {
+            return;
+        }
         let start_offset = (event.start_timestamp() / NANO_TO_SECONDS - time_segments.base_time) as i32;
         let should_clear_segments = start_offset >= MAX_SEGMENT_SIZE as i32 || end_offset > MAX_SEGMENT_SIZE as i32;
 
@@ -138,13 +142,7 @@ impl CpuAnalyzer {
                     let moved_index = i + clear_size;
                     if let Some(segment) = time_segments.segments.get_by_index(moved_index) {
                         let mut cloned_segment = segment.clone();
-                        if event.kind() == 0 {
-                            let cpu_ev = event.as_any().downcast_ref::<CpuEvent>();
-                            cloned_segment.put_cpu_event(cpu_ev.unwrap().clone());
-                        }else if event.kind() == 1 {
-                            let java_futex_ev = event.as_any().downcast_ref::<JavaFutexEvent>();
-                            cloned_segment.put_java_futex_event(java_futex_ev.unwrap().clone());
-                        }
+                        Self::handle_event(&event, &mut cloned_segment);
                         cloned_segment.is_send = 0;
                         time_segments.segments.update_by_index(i, cloned_segment);
                     }
@@ -160,23 +158,25 @@ impl CpuAnalyzer {
         for i in start_offset..=end_offset.min(MAX_SEGMENT_SIZE as i32 - 1) {
             if let Some(segment) = time_segments.segments.get_by_index(i as usize) {
                 let mut cloned_segment = segment.clone();
-
-                if event.kind() == 0 {
-                    let cpu_ev = event.as_any().downcast_ref::<CpuEvent>();
-                    cloned_segment.put_cpu_event(cpu_ev.unwrap().clone());
-                }else if event.kind() == 1 {
-                    let java_futex_ev = event.as_any().downcast_ref::<JavaFutexEvent>();
-                    cloned_segment.put_java_futex_event(java_futex_ev.unwrap().clone());
-                }
-
+                Self::handle_event(&event, &mut cloned_segment);
                 cloned_segment.is_send = 0;
                 time_segments.segments.update_by_index(i as usize, cloned_segment);
             }
         }
     }
 
+    pub fn handle_event(event: &Box<dyn TimedEvent>, segment: &mut Segment) {
+        if event.kind() == 0 {
+            let cpu_ev = event.as_any().downcast_ref::<CpuEvent>();
+            segment.put_cpu_event(cpu_ev.unwrap().clone());
+        } else if event.kind() == 1 {
+            let java_futex_ev = event.as_any().downcast_ref::<JavaFutexEvent>();
+            segment.put_java_futex_event(java_futex_ev.unwrap().clone());
+        }
+    }
+
     pub fn print_cpu_pid_events(&self) {
-        println!("{:?}", self.cpu_pid_events);
+        //println!("{:?}", self.cpu_pid_events);
     }
 
     pub fn send_events(&mut self, pid: u32, start_time: u64, end_time: u64) {

@@ -189,3 +189,13 @@ impl Default for JavaFutexEvent {
         }
     }
 }
+
+impl fmt::Display for JavaFutexEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "JavaFutexEvent(start_time: {}, end_time: {}, data_val: {})",
+            self.start_time, self.end_time, self.data_val
+        )
+    }
+}

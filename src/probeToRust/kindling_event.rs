@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::CStr;
 use libc::c_char;
 
@@ -338,4 +339,11 @@ extern "C" {
 pub struct event_params_for_subscribe {
     pub name: *mut c_char,
     pub value: *mut c_char,
+}
+
+#[derive(Debug)]
+pub(crate) struct SubEvent {
+    pub(crate) Category: String,
+    pub(crate) Name: String,
+    pub(crate) Params: HashMap<String, String>,
 }

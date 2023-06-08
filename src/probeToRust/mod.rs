@@ -2,56 +2,40 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::probeToRust::kindlingEvent::{runForGo, startProfile};
-use crate::probeToRust::rustReceiver::{subEvent, getKindlingEvents};
+use crate::probeToRust::kindling_event::{runForGo, startProfile};
+use crate::probeToRust::rust_receiver::{sub_event, getKindlingEvents, get_capture_statistics, catch_signal_up};
 
-mod event;
-mod kindlingEvent;
-mod rustReceiver;
+mod kindling_event;
+mod rust_receiver;
 
-pub use kindlingEvent::KindlingEventForGo;
+pub use kindling_event::KindlingEventForGo;
 use crate::cpuAnalyzer::{CpuAnalyzer, print_all_event};
 
 
 pub fn startProbeToRust() {
-    let mut sub_event = event::SubEvent {
-        Category: "".to_string(),
-        Name: "".to_string(),
-        Params: Default::default(),
-    };
+    // 初始化probe
     unsafe { runForGo() };
     unsafe { startProfile() };
-    subEvent();
 
+    // 订阅事件
+    sub_event();
+
+    // 初始化on-off cpu分析器
     let cpu_analyzer = Arc::new(Mutex::new(CpuAnalyzer {
         cpu_pid_events: HashMap::new(),
     }));
 
-    // 启动新线程执行print_cpu_pid_events函数
-    let cpu_analyzer_clone_print = Arc::clone(&cpu_analyzer);
+    // 启动内核事件统计
     thread::spawn(move || {
-        let mut start_time = Instant::now(); // 记录起始时间
-        let interval = Duration::from_secs(10); // 指定间隔为10秒
-
-        loop {
-            // 等待间隔时间
-            thread::sleep(interval);
-
-            // 检查是否已经过了指定的间隔时间
-            if start_time.elapsed() >= interval {
-                // 执行要定期执行的代码
-                print_all_event(&cpu_analyzer_clone_print);
-
-                // 重置起始时间
-                start_time = Instant::now();
-            }
-        }
+        get_capture_statistics();
     });
 
-    // 启动新线程执行getKindlingEvents函数
+    // 启动异常退出打印gdb日志
+    thread::spawn(move || {
+        catch_signal_up();
+    });
+
+    // 开始获取事件
     let cpu_analyzer_clone = Arc::clone(&cpu_analyzer);
-    // thread::spawn(move || {
-    //     getKindlingEvents(&cpu_analyzer_clone);
-    // });
     getKindlingEvents(&cpu_analyzer_clone);
 }

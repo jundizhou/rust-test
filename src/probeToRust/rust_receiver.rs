@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
 use std::{fmt, slice};
 use std::sync::{Arc, Mutex};
-use crate::cpuAnalyzer::{consume_cpu_event, CpuAnalyzer};
-use crate::probeToRust::event;
-use crate::probeToRust::kindlingEvent::{event_params_for_subscribe, getEventsByInterval, initKindlingEventForGo, KindlingEventForGo, runForGo, startProfile, subEventForGo};
+use crate::cpuAnalyzer::{consume_cpu_event, consume_java_futex_event, CpuAnalyzer};
+use crate::probeToRust::kindling_event::{catchSignalUp, event_params_for_subscribe, getCaptureStatistics, getEventsByInterval, initKindlingEventForGo, KindlingEventForGo, runForGo, startProfile, stopProfile, subEventForGo, SubEvent};
 
-pub fn subEvent() {
+pub fn sub_event() {
     let subscribe_info = vec![
-        event::SubEvent {
+        SubEvent {
             Category: "".to_string(),
             Name: "tracepoint-cpu_analysis".to_string(),
             Params: Default::default(),
@@ -74,8 +73,9 @@ pub fn getKindlingEvents(ca: &Arc<Mutex<CpuAnalyzer>>) {
                         //println!("{:?}", event);
                         consume_cpu_event(event, ca)
                     },
-                    pattern2 => {
+                    "java_futex_info" => {
                         // 处理 pattern2 的逻辑
+                        consume_java_futex_event(event, ca)
                     }
                     _ => {
                         // 默认情况，处理其他所有情况的逻辑
@@ -87,27 +87,27 @@ pub fn getKindlingEvents(ca: &Arc<Mutex<CpuAnalyzer>>) {
     }
 }
 
-//
-// fn start_profile() {
-//     if unsafe { C_startProfile() } == 0 {
-//         println!("start profile success!");
-//     }
-// }
-//
-// fn stop_profile() {
-//     if unsafe { C_stopProfile() } == 0 {
-//         println!("stop profile success!");
-//     }
-// }
-//
-// fn get_capture_statistics() {
-//     unsafe {
-//         C_getCaptureStatistics();
-//     }
-// }
-//
-// fn catch_signal_up() {
-//     unsafe {
-//         C_catchSignalUp();
-//     }
-// }
+
+pub fn start_profile() {
+    if unsafe { startProfile() } == 0 {
+        println!("start profile success!");
+    }
+}
+
+pub fn stop_profile() {
+    if unsafe { stopProfile() } == 0 {
+        println!("stop profile success!");
+    }
+}
+
+pub fn get_capture_statistics() {
+    unsafe {
+        getCaptureStatistics();
+    }
+}
+
+pub fn catch_signal_up() {
+    unsafe {
+        catchSignalUp();
+    }
+}
