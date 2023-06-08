@@ -1,4 +1,4 @@
-use crate::cpuAnalyzer::cpu_event::Segment;
+use crate::cpuAnalyzer::model::Segment;
 
 #[derive(Debug)]
 pub struct CircleQueue {
@@ -17,6 +17,11 @@ impl CircleQueue {
     pub fn get_by_index(&self, index: usize) -> Option<&Segment> {
         self.data.get(index)
     }
+
+    pub fn get_by_index_mut(&mut self, index: usize) -> Option<&mut Segment> {
+        self.data.get_mut(index)
+    }
+
 
     pub fn update_by_index(&mut self, index: usize, val: Segment) {
         if index < self.length {

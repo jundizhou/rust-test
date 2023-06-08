@@ -1,5 +1,8 @@
+use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use chrono::{DateTime, Local};
+use libc::sleep;
 use serde_derive::Serialize;
 use serde_derive::Deserialize;
 use crate::cpuAnalyzer::circle_queue::CircleQueue;
@@ -43,7 +46,6 @@ impl Default for CpuEvent {
 
 impl fmt::Display for CpuEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // 根据需要定义打印格式
         write!(f, "CpuEvent: start_time={}, end_time={}, type_specs={:?}, runq_latency={:?}, time_type={:?}, on_info={}, off_info={}, log={}, stack={}",
                self.start_time, self.end_time, self.type_specs,
                self.runq_latency, self.time_type, self.on_info, self.off_info, self.log, self.stack)
@@ -61,6 +63,9 @@ impl TimedEvent for CpuEvent {
 
     fn kind(&self) -> i32 {
         return 0;
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -83,8 +88,8 @@ impl TimeSegments {
             segments,
         }
     }
-    pub fn update_thread_name(&mut self, thread_name: String) {
-        self.thread_name = thread_name;
+    pub fn update_thread_name(&mut self, thread_name: &str) {
+        self.thread_name = thread_name.to_string();
     }
 }
 
@@ -93,8 +98,9 @@ pub struct Segment {
     start_time: u64,
     end_time: u64,
     cpu_events: Vec<CpuEvent>,
+    java_futex_event: Vec<JavaFutexEvent>,
     pub is_send: i32,
-    index_timestamp: String,
+    pub index_timestamp: String,
 }
 
 impl Clone for Segment {
@@ -103,6 +109,7 @@ impl Clone for Segment {
             start_time: self.start_time,
             end_time: self.end_time,
             cpu_events: self.cpu_events.iter().cloned().collect(),
+            java_futex_event: self.java_futex_event.iter().cloned().collect(),
             is_send: self.is_send,
             index_timestamp: self.index_timestamp.clone(),
         }
@@ -115,15 +122,70 @@ impl Segment {
             start_time,
             end_time,
             cpu_events: Vec::new(),
+            java_futex_event: Vec::new(),
             is_send: 0,
             index_timestamp: String::new(),
         }
     }
-    pub fn put_timed_event(&mut self, event : CpuEvent) {
+    pub fn put_cpu_event(&mut self, event : CpuEvent) {
         self.cpu_events.push(event);
 
     }
+    pub fn put_java_futex_event(&mut self, event : JavaFutexEvent) {
+        self.java_futex_event.push(event);
+
+    }
+    pub fn is_not_empty(&self) -> bool {
+        !self.cpu_events.is_empty()
+    }
+
+    pub fn update_index_timestamp(&mut self) {
+        let local_time: DateTime<Local> = Local::now();
+        self.index_timestamp = local_time.to_string();
+    }
+
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JavaFutexEvent {
+    pub start_time: u64,
+    pub end_time: u64,
+    pub data_val: String,
+}
 
+impl JavaFutexEvent {
+    fn new() -> Self {
+        JavaFutexEvent {
+            start_time: 0,
+            end_time: 0,
+            data_val: String::new(),
+        }
+    }
+}
 
+impl TimedEvent for JavaFutexEvent {
+    fn start_timestamp(&self) -> u64 {
+        self.start_time
+    }
+
+    fn end_timestamp(&self) -> u64 {
+        self.end_time
+    }
+
+    fn kind(&self) -> i32 {
+        return 1;
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Default for JavaFutexEvent {
+    fn default() -> Self {
+        JavaFutexEvent {
+            start_time: 0,
+            end_time: 0,
+            data_val: String::new(),
+        }
+    }
+}

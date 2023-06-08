@@ -25,7 +25,6 @@ pub fn startProbeToRust() {
 
     let cpu_analyzer = Arc::new(Mutex::new(CpuAnalyzer {
         cpu_pid_events: HashMap::new(),
-        lock: Mutex::new(()),
     }));
 
     // 启动新线程执行print_cpu_pid_events函数

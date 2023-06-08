@@ -1,5 +1,5 @@
 mod circle_queue;
-mod cpu_event;
+mod model;
 mod cpu_analyzer;
 mod time_event;
 

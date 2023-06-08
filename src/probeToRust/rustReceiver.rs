@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
-use std::slice;
+use std::{fmt, slice};
 use std::sync::{Arc, Mutex};
 use crate::cpuAnalyzer::{consume_cpu_event, CpuAnalyzer};
 use crate::probeToRust::event;
@@ -13,11 +13,6 @@ pub fn subEvent() {
             Name: "tracepoint-cpu_analysis".to_string(),
             Params: Default::default(),
         },
-        // event::SubEvent {
-        //     Category: "net".to_string(),
-        //     Name: "tracepoint-cpu_analysis".to_string(),
-        //     Params: Default::default(),
-        // },
     ];
 
     if subscribe_info.is_empty() {
@@ -50,7 +45,6 @@ pub fn subEvent() {
 
 pub fn getKindlingEvents(ca: &Arc<Mutex<CpuAnalyzer>>) {
     let mut count = 0;
-
 
     const KEY_VALUE_ARRAY_SIZE: usize = 16;
 
@@ -92,3 +86,28 @@ pub fn getKindlingEvents(ca: &Arc<Mutex<CpuAnalyzer>>) {
         count = 0;
     }
 }
+
+//
+// fn start_profile() {
+//     if unsafe { C_startProfile() } == 0 {
+//         println!("start profile success!");
+//     }
+// }
+//
+// fn stop_profile() {
+//     if unsafe { C_stopProfile() } == 0 {
+//         println!("stop profile success!");
+//     }
+// }
+//
+// fn get_capture_statistics() {
+//     unsafe {
+//         C_getCaptureStatistics();
+//     }
+// }
+//
+// fn catch_signal_up() {
+//     unsafe {
+//         C_catchSignalUp();
+//     }
+// }
